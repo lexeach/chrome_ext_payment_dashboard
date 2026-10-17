@@ -53,6 +53,17 @@ function AdminApp() {
   const filteredProfiles = useMemo(()=>profiles.filter(x=>`${x.name} ${x.user_email} ${x.id}`.toLowerCase().includes(query.toLowerCase())),[profiles,query]);
   const filteredOrders = useMemo(()=>orders.filter(x=>`${x.profile_name} ${x.user_email} ${x.order_id} ${x.status}`.toLowerCase().includes(query.toLowerCase())),[orders,query]);
   const refresh = async()=>{setBusy(true);setError('');try{await loadAll()}catch(e){setError(e.message)}finally{setBusy(false)}};
+  async function manuallyActivate(profile) {
+    if (profile.is_active) return;
+    if (!window.confirm(`Manually activate "${profile.name}" for ${profile.user_email}? This bypasses online payment.`)) return;
+    setBusy(true); setError('');
+    try {
+      await request(`/api/admin/profiles/${encodeURIComponent(profile.id)}/activate`, { method:'POST', body: JSON.stringify({}) });
+      await loadAll();
+    } catch(e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
   if (!token) return <main className="admin-auth-shell"><form className="admin-auth-card" onSubmit={login}>
     <div className="admin-brand-mark"><ShieldCheck size={26}/></div><p className="admin-eyebrow">AUTOFILL CONSOLE</p><h1>Admin sign in</h1>
     <p className="admin-muted">Restricted access. Use the administrator credentials configured on the backend.</p>
@@ -79,9 +90,9 @@ function AdminApp() {
         <div><span><CircleDollarSign/></span><small>Verified payments</small><strong>{stats?.paidOrders??'—'}</strong><small>₹{((stats?.paidAmountPaise||0)/100).toLocaleString('en-IN')}</small></div>
       </section><section className="admin-panel"><h2>Admin panel ready</h2><p>Use the sections on the left to review registered accounts, profile metadata and payment order status.</p><p className="admin-note"><LockKeyhole size={16}/> Profile field contents are intentionally excluded from the admin profile list.</p></section></>}
       {tab!=='overview'&&<section className="admin-panel"><div className="admin-table-head"><div><h2>{tab==='users'?'Registered users':tab==='profiles'?'Profile records':'Payment history'}</h2><p className="admin-muted">Showing latest records returned by the backend.</p></div><div className="admin-search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search records…"/></div></div>
-      <div className="admin-table-wrap"><table><thead><tr>{tab==='users'?<><th>Email</th><th>Status</th><th>Created</th><th>User ID</th></>:tab==='profiles'?<><th>Profile</th><th>Owner</th><th>Fields</th><th>Payment link</th><th>Created</th></>:<><th>Order / Payment ID</th><th>Account</th><th>Profile</th><th>Amount</th><th>Status</th><th>Created</th></>}</tr></thead><tbody>
+      <div className="admin-table-wrap"><table><thead><tr>{tab==='users'?<><th>Email</th><th>Status</th><th>Created</th><th>User ID</th></>:tab==='profiles'?<><th>Profile</th><th>Owner</th><th>Fields</th><th>Status</th><th>Created</th><th>Action</th></>:<><th>Order / Payment ID</th><th>Account</th><th>Profile</th><th>Amount</th><th>Status</th><th>Created</th></>}</tr></thead><tbody>
       {tab==='users'&&filteredUsers.map(x=><tr key={x.id}><td>{x.email}</td><td><span className={x.active?'admin-pill good':'admin-pill'}>{x.active?'Active':'Inactive'}</span></td><td>{x.created_at?new Date(x.created_at).toLocaleString():'—'}</td><td className="admin-id">{x.id}</td></tr>)}
-      {tab==='profiles'&&filteredProfiles.map(x=><tr key={x.id}><td>{x.name}</td><td>{x.user_email}</td><td>{x.field_count}</td><td>{x.paid_order?'Linked to paid order':'Legacy / unlinked'}</td><td>{x.created_at?new Date(x.created_at).toLocaleString():'—'}</td></tr>)}
+      {tab==='profiles'&&filteredProfiles.map(x=><tr key={x.id}><td>{x.name}</td><td>{x.user_email}</td><td>{x.field_count}</td><td><span className={x.is_active?'admin-pill good':'admin-pill danger-pill'}>{x.is_active?'Activated':'Not activated'}</span><small>{x.activation_method==='admin'?'Manual admin activation':x.activation_method==='payment'?'Payment verified':''}</small></td><td>{x.created_at?new Date(x.created_at).toLocaleString():'—'}</td><td>{x.is_active?<span className="admin-pill good">Active</span>:<button className="admin-activate-btn" disabled={busy} onClick={()=>manuallyActivate(x)}>Activate manually</button>}</td></tr>)}
       {tab==='orders'&&filteredOrders.map(x=><tr key={x.order_id}><td><span className="admin-id">{x.order_id}</span><small>{x.payment_id||'Payment not recorded'}</small></td><td>{x.user_email}</td><td>{x.profile_name||'—'}</td><td>₹{(Number(x.amount_paise||0)/100).toLocaleString('en-IN')}</td><td><span className={x.status==='paid'?'admin-pill good':'admin-pill'}>{x.status}</span></td><td>{x.created_at?new Date(x.created_at).toLocaleString():'—'}</td></tr>)}
       {((tab==='users'&&!filteredUsers.length)||(tab==='profiles'&&!filteredProfiles.length)||(tab==='orders'&&!filteredOrders.length))&&<tr><td colSpan="6" className="admin-empty">No matching records found.</td></tr>}
       </tbody></table></div></section>}
