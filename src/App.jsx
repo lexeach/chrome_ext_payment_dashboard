@@ -17,7 +17,7 @@ export default function App(){
  const auth=async e=>{e.preventDefault();setBusy(true);setError('');try{localStorage.setItem('apiBase',api);const data=await request(`/api/auth/${mode==='login'?'login':'register'}`,{method:'POST',body:JSON.stringify({email,password})});sessionStorage.setItem('token',data.token);setToken(data.token);setUser(data.user);setPassword('');const ps=await fetch(api.replace(/\/$/,'')+'/api/profiles',{headers:{Authorization:`Bearer ${data.token}`}}).then(r=>r.json());setProfiles(ps.profiles||[])}catch(e){setError(e.message)}finally{setBusy(false)}};
  const logout=()=>{sessionStorage.removeItem('token');setToken('');setUser(null);setProfiles([]);setEditor(null);setError('')};
  const newProfile=()=>{setEditor(null);setEditorOpen(true);setName('');setFields(Object.fromEntries(fieldsList.map(k=>[k,''])))};
- const editProfile=p=>{setEditor(p.id);setEditorOpen(true);setName(p.name);setFields({spouse:'',...p.fields})};
+ const editProfile=p=>{setEditor(p.id);setEditorOpen(true);setName(p.name);const savedFields=p.fields||{};const orderedFields=Object.fromEntries(fieldsList.map(k=>[k,savedFields[k]??'']));const customFields=Object.fromEntries(Object.entries(savedFields).filter(([k])=>!fieldsList.includes(k)));setFields({...orderedFields,...customFields})};
  const save=async e=>{
   e.preventDefault();setBusy(true);setError('');
   try{
